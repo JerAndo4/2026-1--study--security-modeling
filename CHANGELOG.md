@@ -1,3 +1,5 @@
+## [1.4.7](github.com/yamadharma/course-directory-student-template/compare/v1.0.0...v1.4.7) (2026-03-06)
+
 ## 1.4.7 (2026-03-06)
 
 
