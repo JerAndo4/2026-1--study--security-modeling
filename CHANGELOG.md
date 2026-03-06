@@ -1,3 +1,10 @@
+## 1.4.7 (2026-03-06)
+
+
+### Features
+
+* **main:** make course structure ([8162ea4](github.com/yamadharma/course-directory-student-template/commits/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
+
 ## 1.4.7 (2026-03-05)
 
 
