@@ -4,6 +4,14 @@
 ### Features
 
 * **lab01:** add exponential growth model ([873de49](https://github.com/yamadharma/course-directory-student-template/commit/873de49545cf0eecff6bb36d7f6b17752500284d))
+* **lab01:** add lab01 files ([0dc256f](https://github.com/yamadharma/course-directory-student-template/commit/0dc256f4091fa21f6d56f139e185fd7470786392))
+* **main:** make course structure ([8162ea4](https://github.com/yamadharma/course-directory-student-template/commit/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
+## 1.4.7 (2026-03-06)
+
+
+### Features
+
+* **lab01:** add exponential growth model ([873de49](https://github.com/yamadharma/course-directory-student-template/commit/873de49545cf0eecff6bb36d7f6b17752500284d))
 * **main:** make course structure ([8162ea4](https://github.com/yamadharma/course-directory-student-template/commit/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
 ## 1.4.7 (2026-03-06)
 
