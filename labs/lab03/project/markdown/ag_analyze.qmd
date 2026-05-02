@@ -1,0 +1,99 @@
+# Визуализация и анализ графа атак
+
+Загружает сохранённые данные, строит граф с цветовой индикацией
+по PageRank, выводит топ критичных узлов.
+
+```{julia}
+using DrWatson
+@quickactivate "project"
+```
+
+## Загрузка зависимостей
+
+```{julia}
+using Graphs, JLD2, Plots, GraphRecipes
+include(srcdir("attack_graph.jl"))
+```
+
+## Загрузка данных
+
+```{julia}
+params = Dict(
+    :n => 20,
+    :edge_prob => 0.2,
+    :source => 1,
+    :target => 20,
+    :cvss_scores => Dict((1, 3) => 0.9, (2, 5) => 0.7, (3, 8) => 0.8, (5, 20) => 0.95),
+    :trust_relations => [(4, 6), (6, 10), (10, 15)],
+)
+filename = datadir("attack_graph", savename(params, "jld2"))
+@load filename data
+
+g = data[:graph]
+metrics = data[:metrics]
+```
+
+## Цветовая шкала по PageRank
+
+Нормализуем PageRank от 0 до 1 и отображаем на палитру `:RdYlGn`
+(красный — высокий ранг, зелёный — низкий).
+
+```{julia}
+pagerank = metrics[:pagerank]
+norm_rank = (pagerank .- minimum(pagerank)) ./ (maximum(pagerank) - minimum(pagerank))
+colors = [cgrad(:RdYlGn, rev = true)[norm_rank[i]] for i = 1:nv(g)]
+```
+
+## Построение и сохранение графика
+
+```{julia}
+graphplot(
+    g,
+    nodeshape = :circle,
+    curves = false,
+    linecolor = :black,
+    nodecolor = colors,
+    nodelabel = 1:nv(g),
+    title = "Граф атак (цвет = PageRank)",
+    size = (800, 600),
+)
+savefig(plotsdir("attack_graph.png"))
+println("График сохранён в ", plotsdir("attack_graph.png"))
+```
+
+## Анализ
+
+```{julia}
+println("=== Анализ графа атак ===")
+println("Количество узлов: ", nv(g))
+println("Количество рёбер: ", ne(g))
+println(
+    "Количество путей от ",
+    params[:source],
+    " к ",
+    params[:target],
+    ": ",
+    length(data[:paths]),
+)
+if !isempty(data[:paths])
+    println("Длины путей: ", [length(p) for p in data[:paths]])
+    println("Наиболее вероятный путь: ", data[:likely_path])
+end
+
+println("\nТоп-5 узлов по in-degree:")
+top_indeg = sortperm(metrics[:in_degree], rev = true)[1:5]
+for i in top_indeg
+    println("  Узел $i: in-degree = $(metrics[:in_degree][i])")
+end
+
+println("\nТоп-5 узлов по PageRank:")
+top_pr = sortperm(metrics[:pagerank], rev = true)[1:5]
+for i in top_pr
+    println("  Узел $i: PageRank = $(round(metrics[:pagerank][i], digits=4))")
+end
+```
+
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
