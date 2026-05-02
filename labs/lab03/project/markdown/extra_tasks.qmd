@@ -1,0 +1,328 @@
+# Дополнительные задания: расширенный анализ графа атак
+
+Шесть дополнительных экспериментов, углубляющих анализ безопасности сети:
+CVSS + Дейкстра, агентная модель, сравнение метрик центральности,
+реальная топология, визуализация, защитные меры.
+
+```{julia}
+ENV["GKSwstype"] = "100"   # headless-режим, отключает GUI-окно GKS
+
+using DrWatson
+@quickactivate "project"
+```
+
+## Загрузка зависимостей
+
+```{julia}
+using Graphs, Plots, GraphRecipes, JLD2, Random, StatsBase, LinearAlgebra, DataFrames, CSV
+include(srcdir("attack_graph.jl"))
+
+Random.seed!(42)   # фиксируем seed для воспроизводимости
+```
+
+## Задание 1. CVSS-веса и алгоритм Дейкстры
+
+Граф атак с явными CVSS-оценками на рёбрах. Дейкстра в пространстве
+логарифмических вероятностей: минимизируем $-\sum \log p_e$,
+что эквивалентно максимизации произведения вероятностей по пути.
+
+Ключевые CVSS-оценки:
+- `(1,3) = 0.9` — критическая уязвимость;
+- `(3,10) = 0.85` — высокая;
+- `(2,5) = 0.7`, `(5,20) = 0.95` — альтернативный путь через 2→5→20.
+
+```{julia}
+cvss = Dict(
+    (1, 3)   => 0.90,   # критическая уязвимость
+    (3, 10)  => 0.85,   # высокая
+    (10, 20) => 0.80,   # высокая
+    (2, 5)   => 0.70,   # средняя
+    (5, 20)  => 0.95,   # критическая
+    (1, 7)   => 0.60,   # средняя
+    (7, 15)  => 0.50,   # низкая
+    (15, 20) => 0.55,   # низкая
+)
+trust = [(1, 2), (3, 5)]   # доверительные отношения между узлами
+
+g1 = build_attack_graph(20, 0.15, cvss, trust)       # строим граф
+weights1 = assign_edge_weights(g1, cvss)              # присваиваем веса рёбрам
+path1, prob1 = most_likely_path(g1, 1, 20, weights1) # Дейкстра: -log(p)
+
+println("=== Задание 1: Дейкстра + CVSS ===")
+println("Наиболее вероятный путь: ", path1)
+println("Вероятность успеха:      ", round(prob1, digits=4))
+```
+
+Визуализация: рёбра оптимального пути выделены красным.
+
+```{julia}
+path_edges1 = Set(zip(path1[1:end-1], path1[2:end]))   # пары (u,v) вдоль пути
+edge_colors1 = [
+    (src(e), dst(e)) in path_edges1 ? :red : :lightblue  # красный = оптимальный путь
+    for e in edges(g1)
+]
+
+graphplot(
+    g1,
+    nodeshape = :circle,
+    curves = false,
+    linecolor = edge_colors1,
+    nodelabel = 1:nv(g1),
+    title = "Граф атак: оптимальный путь (Дейкстра + CVSS)",
+    size = (900, 650),
+)
+savefig(plotsdir("extra_cvss_dijkstra.png"))
+println("График сохранён: extra_cvss_dijkstra.png")
+```
+
+## Задание 2. Агентная модель распространения атаки
+
+Каждый узел находится в одном из двух состояний: **S** (safe) или **C** (compromised).
+На каждом шаге вероятность компрометации незащищённого узла $v$:
+
+$$P(\text{comp}_v) = 1 - \prod_{u \in N^-(v),\, u \in C} (1 - p_{u \to v})$$
+
+т.е. хотя бы один скомпрометированный сосед «заражает» $v$ с вероятностью ребра.
+
+```{julia}
+g2 = build_attack_graph(20, 0.25, cvss, trust)
+weights2 = assign_edge_weights(g2, cvss)
+
+function simulate_spread(g, weights, source; steps = 15)
+    compromised = Set([source])      # начальное состояние: только источник
+    history = [length(compromised)]  # история размера множества
+    for _ in 1:steps
+        new_comp = Set{Int}()
+        for v in 1:nv(g)
+            v in compromised && continue   # уже скомпрометирован — пропускаем
+            p_safe = 1.0                   # вероятность остаться в безопасности
+            for u in inneighbors(g, v)
+                u in compromised || continue               # интересует только скомп. сосед
+                p_edge = get(weights, Edge(u, v), 0.5)    # вес ребра u→v (по умолч. 0.5)
+                p_safe *= (1 - p_edge)                    # перемножаем вероятности выжить
+            end
+            rand() > p_safe && push!(new_comp, v)   # компрометируем с вер. (1 - p_safe)
+        end
+        union!(compromised, new_comp)          # объединяем со скомпрометированными
+        push!(history, length(compromised))    # записываем текущий размер
+    end
+    return history, compromised
+end
+
+history2, final_comp2 = simulate_spread(g2, weights2, 1)
+
+println("\n=== Задание 2: Агентная модель ===")
+println("Скомпрометировано за 15 шагов: $(last(history2)) из $(nv(g2)) узлов")
+println("Узлы: ", sort(collect(final_comp2)))
+
+plot(
+    0:length(history2)-1, history2,
+    xlabel = "Шаг",
+    ylabel = "Скомпрометированных узлов",
+    title = "Агентная модель: распространение атаки",
+    marker = :circle,
+    lw = 2,
+    legend = false,
+    size = (800, 500),
+)
+savefig(plotsdir("extra_agent_spread.png"))
+println("График сохранён: extra_agent_spread.png")
+```
+
+## Задание 3. Сравнение метрик центральности
+
+Запускаем агентную модель на 50 случайных графах. После каждого прогона
+считаем, сколько раз каждый узел был скомпрометирован. Затем вычисляем
+ранговую корреляцию Спирмена между частотой компрометации и каждой
+метрикой центральности.
+
+```{julia}
+n_sim = 50        # число повторных экспериментов
+n_nodes3 = 15     # размер сети
+hit_count = zeros(Int, n_nodes3)   # счётчик компрометаций по узлам
+
+for _ in 1:n_sim
+    g3 = build_attack_graph(n_nodes3, 0.25, Dict(), [])   # случайный граф
+    w3 = assign_edge_weights(g3, Dict())                   # веса по умолч. 0.5
+    _, comp = simulate_spread(g3, w3, 1; steps = 10)       # симуляция
+    for v in comp
+        hit_count[v] += 1   # увеличиваем счётчик для каждого скомпрометированного
+    end
+end
+
+g_ref = build_attack_graph(n_nodes3, 0.25, Dict(), [])   # граф для вычисления метрик
+m_ref = compute_centrality_metrics(g_ref)
+
+metrics_map = Dict(
+    "In-degree"   => m_ref[:in_degree],    # число входящих рёбер
+    "Betweenness" => m_ref[:betweenness],  # центральность по посредничеству
+    "Closeness"   => m_ref[:closeness],    # центральность по близости
+    "PageRank"    => m_ref[:pagerank],     # PageRank
+)
+
+println("\n=== Задание 3: Корреляция метрик центральности с уязвимостью ===")
+correlations = Dict{String,Float64}()
+for (name, vals) in metrics_map
+    ρ = corspearman(Float64.(hit_count), Float64.(vals))   # ранговая корреляция Спирмена
+    correlations[name] = ρ
+    println("  $name: ρ = $(round(ρ, digits=3))")
+end
+
+best_metric = argmax(x -> abs(correlations[x]), collect(keys(correlations)))   # лучший предиктор
+println("Лучшая метрика-предиктор: $best_metric")
+
+bar(
+    collect(keys(correlations)),
+    abs.(collect(values(correlations))),   # берём модуль корреляции
+    xlabel = "Метрика",
+    ylabel = "|ρ Спирмена|",
+    title = "Предсказательная сила метрик центральности",
+    legend = false,
+    size = (800, 500),
+    color = :steelblue,
+)
+savefig(plotsdir("extra_centrality_comparison.png"))
+println("График сохранён: extra_centrality_comparison.png")
+```
+
+## Задание 4. Реальная топология: граф Барабаши–Альберт
+
+Сеть Барабаши–Альберт (`barabasi_albert`) — стандартная модель
+безмасштабных сетей с предпочтительным присоединением.
+Распределение степеней узлов подчиняется степенному закону,
+как в реальных сетях (интернет, инфраструктурные сети).
+
+```{julia}
+g4 = barabasi_albert(30, 3; is_directed = true, seed = 42)   # n=30, каждый новый узел цепляет 3 ребра
+println("\n=== Задание 4: Граф Барабаши–Альберт (n=30, m=3) ===")
+println("Рёбер: $(ne(g4)),  Узлов: $(nv(g4))")
+
+w4 = assign_edge_weights(g4, Dict())         # веса рёбер (по умолч. 0.5)
+paths4 = find_all_paths(g4, 1, 30)           # все пути от узла 1 до 30
+metrics4 = compute_centrality_metrics(g4)
+
+println("Путей 1→30: ", length(paths4))
+top5_pr = sortperm(metrics4[:pagerank], rev = true)[1:5]   # топ-5 по PageRank
+println("Топ-5 узлов по PageRank: ", top5_pr)
+
+degree_dist = degree(g4)   # суммарная степень (in + out) каждого узла
+histogram(
+    degree_dist,
+    xlabel = "Степень узла",
+    ylabel = "Частота",
+    title = "Распределение степеней (граф Барабаши–Альберт)",
+    legend = false,
+    size = (800, 500),
+    color = :orange,
+)
+savefig(plotsdir("extra_barabasi_degree.png"))
+println("График сохранён: extra_barabasi_degree.png")
+```
+
+## Задание 5. Расширенная визуализация графа
+
+Цветовая шкала PageRank + подписи рёбер с CVSS-весами
++ выделение наиболее вероятного пути.
+
+```{julia}
+g5 = build_attack_graph(15, 0.2, cvss, [(1, 2)])
+w5 = assign_edge_weights(g5, cvss)
+path5, prob5 = most_likely_path(g5, 1, 15, w5)   # оптимальный путь
+m5 = compute_centrality_metrics(g5)
+
+pr5 = m5[:pagerank]
+norm5 = (pr5 .- minimum(pr5)) ./ (maximum(pr5) - minimum(pr5) .+ 1e-9)  # нормализация [0,1]
+node_colors5 = [cgrad(:RdYlGn, rev = true)[norm5[i]] for i in 1:nv(g5)] # красный = высокий PageRank
+
+path_edges5 = Set(zip(path5[1:end-1], path5[2:end]))   # рёбра оптимального пути
+lc5 = [
+    (src(e), dst(e)) in path_edges5 ? :red : :grey60   # красный = путь, серый = остальные
+    for e in edges(g5)
+]
+lw5 = [
+    (src(e), dst(e)) in path_edges5 ? 2.5 : 1.0   # толще = путь атаки
+    for e in edges(g5)
+]
+
+graphplot(
+    g5,
+    nodeshape = :circle,
+    curves = false,
+    nodecolor = node_colors5,   # цвет узла по PageRank
+    linecolor = lc5,            # цвет ребра: путь или нет
+    linewidth = lw5,            # толщина ребра
+    nodelabel = 1:nv(g5),
+    title = "Граф атак: PageRank (цвет) + оптимальный путь (красный)",
+    size = (900, 700),
+)
+savefig(plotsdir("extra_rich_visualization.png"))
+println("\n=== Задание 5 ===")
+println("График сохранён: extra_rich_visualization.png")
+println("Оптимальный путь: ", path5, "  p = ", round(prob5, digits=4))
+```
+
+## Задание 6. Эффективность защитных мер
+
+Стратегия: поочерёдно изолируем узлы с наибольшей `betweenness centrality`
+и измеряем снижение числа путей атаки.
+Гипотеза: betweenness хорошо предсказывает «узкие места» сети.
+
+```{julia}
+g6_base = build_attack_graph(18, 0.25, Dict(), [])
+source6, target6 = 1, 18
+
+baseline_paths = find_all_paths(g6_base, source6, target6)
+println("\n=== Задание 6: Защитные меры ===")
+println("Исходное число путей: ", length(baseline_paths))
+
+function isolate_top_k(g, source, target, k)
+    m = compute_centrality_metrics(g)
+    top_nodes = sortperm(m[:betweenness], rev = true)[1:k]   # k узлов с макс. betweenness
+    g_copy = copy(g)
+    for node in top_nodes
+        for u in copy(inneighbors(g_copy, node))
+            rem_edge!(g_copy, u, node)    # удаляем входящие рёбра
+        end
+        for v in copy(outneighbors(g_copy, node))
+            rem_edge!(g_copy, node, v)    # удаляем исходящие рёбра
+        end
+    end
+    paths = find_all_paths(g_copy, source, target)   # пути после изоляции
+    return length(paths), top_nodes
+end
+
+k_vals = 0:5
+path_counts6 = Int[]
+for k in k_vals
+    if k == 0
+        push!(path_counts6, length(baseline_paths))   # базовое значение без изоляции
+    else
+        n_paths, nodes = isolate_top_k(g6_base, source6, target6, k)
+        push!(path_counts6, n_paths)
+        println("  Изолировано $k узлов: путей осталось $n_paths")
+    end
+end
+
+reduction_pct = @. round((1 - path_counts6 / max(path_counts6[1], 1)) * 100, digits=1)  # % снижения
+
+plot(
+    collect(k_vals), path_counts6,
+    xlabel = "Число изолированных узлов (betweenness top-k)",
+    ylabel = "Число путей атаки",
+    title = "Снижение числа путей при изоляции узлов",
+    marker = :circle,
+    lw = 2,
+    legend = false,
+    size = (800, 500),
+)
+annotate!(
+    collect(k_vals),
+    path_counts6,
+    [text("-$(r)%", 8, :top) for r in reduction_pct],   # подписываем % снижения над точками
+)
+savefig(plotsdir("extra_protection.png"))
+println("График сохранён: extra_protection.png")
+```
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+
