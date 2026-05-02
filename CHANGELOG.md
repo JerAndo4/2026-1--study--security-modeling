@@ -1,29 +1,25 @@
-## 1.4.7 (2026-03-06)
+# Changelog
 
-
-### Features
-
-* **lab01:** add exponential growth model ([873de49](https://github.com/yamadharma/course-directory-student-template/commit/873de49545cf0eecff6bb36d7f6b17752500284d))
-* **lab01:** add lab01 files ([0dc256f](https://github.com/yamadharma/course-directory-student-template/commit/0dc256f4091fa21f6d56f139e185fd7470786392))
-* **main:** make course structure ([8162ea4](https://github.com/yamadharma/course-directory-student-template/commit/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
-## 1.4.7 (2026-03-06)
-
+## 1.4.0 (2026-05-02)
 
 ### Features
 
-* **lab01:** add exponential growth model ([873de49](https://github.com/yamadharma/course-directory-student-template/commit/873de49545cf0eecff6bb36d7f6b17752500284d))
-* **main:** make course structure ([8162ea4](https://github.com/yamadharma/course-directory-student-template/commit/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
-## 1.4.7 (2026-03-06)
+* **lab03:** построение и анализ графов атак (DrWatson-проект, `src/attack_graph.jl`)
+* **lab03:** скрипты однократного эксперимента, анализа, сходимости и sweep по параметрам
+* **lab03:** шесть дополнительных экспериментов — CVSS+Дейкстра, агентная модель, метрики центральности, граф Барабаши–Альберт, визуализация, защитные меры
+* **lab03:** генерация Quarto-markdown и Jupyter-ноутбуков через Literate.jl
+* **lab03:** отчёт с девятью визуализациями и ответами на контрольные вопросы
+* **lab03:** презентация в форматах beamer и reveal.js
 
-
-### Features
-
-* **lab01:** add exponential growth model ([873de49](github.com/yamadharma/course-directory-student-template/commits/873de49545cf0eecff6bb36d7f6b17752500284d))
-* **main:** make course structure ([8162ea4](github.com/yamadharma/course-directory-student-template/commits/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
-
-## 1.4.7 (2026-03-05)
-
+## 1.3.0 (2026-04-04)
 
 ### Features
 
-* **main:** make course structure ([8162ea4](https://github.com/yamadharma/course-directory-student-template/commit/8162ea4c2d794f97a8d1d2cada16a9b02e40c19e))
+* **lab02:** вероятностное моделирование пуассоновского потока атак
+
+## 1.2.0 (2026-03-07)
+
+### Features
+
+* **lab01:** add exponential growth model
+* **main:** make course structure

@@ -364,3 +364,5 @@ plugins
 .vbox/
 .config/
 vm/
+
+.DS_Store
