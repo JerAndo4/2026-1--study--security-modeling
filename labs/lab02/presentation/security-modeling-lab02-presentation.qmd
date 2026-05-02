@@ -67,11 +67,11 @@ date-format: "YYYY-MM-DD"
 
 # Подготовка проекта
 
-![Скрипт scripts/run_experiment.jl](image/2.png){#fig-002 width=40%}
+![Скрипт scripts/run_experiment.jl](image/2.png){#fig-002 width=35%}
 
 # Подготовка проекта
 
-![Скрипт scripts/analyze.jl](image/3.png){#fig-003 width=50%}
+![Скрипт scripts/analyze.jl](image/3.png){#fig-003 width=35%}
 
 # Подготовка проекта
 
